@@ -475,6 +475,6 @@ typedef void *const voidpc;
 #endif
 
 #include "miniz_common.h"
-#include "miniz_tdef.h"
+#include "miniz_tdefl.h"
 #include "miniz_tinfl.h"
 #include "miniz_zip.h"

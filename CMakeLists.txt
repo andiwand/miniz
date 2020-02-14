@@ -1,12 +1,5 @@
 cmake_minimum_required(VERSION 3.0)
-
-if(CMAKE_MINOR_VERSION LESS 12)
-  project(miniz)
-  # see issue https://gitlab.kitware.com/cmake/cmake/merge_requests/1799
-else()
-  project(miniz C)
-endif()
-
+project(miniz C CXX)
 
 set(MINIZ_API_VERSION 2)
 set(MINIZ_MINOR_VERSION 1)
@@ -22,12 +15,11 @@ if(CMAKE_BUILD_TYPE STREQUAL "")
 CMAKE_C_FLAGS used) Debug Release RelWithDebInfo MinSizeRel." FORCE)
 endif ()
 
+option(BUILD_TESTS "Build tests" ON)
 option(BUILD_EXAMPLES "Build examples" ON)
 option(AMALGAMATE_SOURCES "Amalgamate sources into miniz.h/c" OFF)
 option(BUILD_HEADER_ONLY "Build a header-only version" OFF)
 option(BUILD_SHARED_LIBS "Build shared library instead of static" ON)
-
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
 if(BUILD_HEADER_ONLY)
   set(AMALGAMATE_SOURCES ON CACHE BOOL "Build a header-only version" FORCE)
@@ -35,29 +27,31 @@ endif(BUILD_HEADER_ONLY)
 
 if(AMALGAMATE_SOURCES)
   # Amalgamate
-  file(COPY miniz.h DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/amalgamation/)
-  file(READ miniz.h MINIZ_H)
-  file(READ miniz_common.h MINIZ_COMMON_H)
-  file(READ miniz_tdef.h MINIZ_TDEF_H)
-  file(READ miniz_tinfl.h MINIZ_TINFL_H)
-  file(READ miniz_zip.h MINIZ_ZIP_H)
+  file(COPY src/miniz.h DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/amalgamation)
+  file(READ src/miniz.h MINIZ_H)
+  file(READ src/miniz_common.h MINIZ_COMMON_H)
+  file(READ src/miniz_tdefl.h MINIZ_TDEFL_H)
+  file(READ src/miniz_tinfl.h MINIZ_TINFL_H)
+  file(READ src/miniz_zip.h MINIZ_ZIP_H)
   file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/amalgamation/miniz.h
-     "${MINIZ_COMMON_H} ${MINIZ_TDEF_H} ${MINIZ_TINFL_H} ${MINIZ_ZIP_H}")
+     "${MINIZ_COMMON_H} ${MINIZ_TDEFL_H} ${MINIZ_TINFL_H} ${MINIZ_ZIP_H}")
 
-  file(COPY miniz.c DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/amalgamation/)
-  file(READ miniz_tdef.c MINIZ_TDEF_C)
-  file(READ miniz_tinfl.c MINIZ_TINFL_C)
-  file(READ miniz_zip.c MINIZ_ZIP_C)
+  file(COPY src/miniz.c DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/amalgamation/)
+  file(READ src/miniz_tdefl.c MINIZ_TDEFL_C)
+  file(READ src/miniz_tinfl.c MINIZ_TINFL_C)
+  file(READ src/miniz_zip.c MINIZ_ZIP_C)
   file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/amalgamation/miniz.c
-     "${MINIZ_TDEF_C} ${MINIZ_TINFL_C} ${MINIZ_ZIP_C}")
+     "${MINIZ_TDEFL_C} ${MINIZ_TINFL_C} ${MINIZ_ZIP_C}")
 
   file(READ ${CMAKE_CURRENT_BINARY_DIR}/amalgamation/miniz.h AMAL_MINIZ_H)
   file(READ ${CMAKE_CURRENT_BINARY_DIR}/amalgamation/miniz.c AMAL_MINIZ_C)
-  foreach(REPLACE_STRING miniz;miniz_common;miniz_tdef;miniz_tinfl;miniz_zip;miniz_export)
+  foreach(REPLACE_STRING miniz;miniz_common;miniz_tdefl;miniz_tinfl;miniz_zip;miniz_export)
     string(REPLACE "#include \"${REPLACE_STRING}.h\"" "" AMAL_MINIZ_H "${AMAL_MINIZ_H}")
     string(REPLACE "#include \"${REPLACE_STRING}.h\"" "" AMAL_MINIZ_C "${AMAL_MINIZ_C}")
   endforeach()
+
   string(CONCAT AMAL_MINIZ_H "#define MINIZ_EXPORT\n" "${AMAL_MINIZ_H}")
+
   if(BUILD_HEADER_ONLY)
     string(CONCAT AMAL_MINIZ_H "${AMAL_MINIZ_H}" "\n#ifndef MINIZ_HEADER_FILE_ONLY\n"
              "${AMAL_MINIZ_C}" "\n#endif // MINIZ_HEADER_FILE_ONLY\n")
@@ -91,8 +85,8 @@ if(AMALGAMATE_SOURCES)
   set(INSTALL_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/amalgamation/miniz.h)
 else(AMALGAMATE_SOURCES)
   include(GenerateExportHeader)
-  set(miniz_SOURCE miniz.c miniz_zip.c miniz_tinfl.c miniz_tdef.c)
-  add_library(${PROJECT_NAME} ${miniz_SOURCE})
+
+  add_library(${PROJECT_NAME} src/miniz.c src/miniz_zip.c src/miniz_tinfl.c src/miniz_tdefl.c)
   generate_export_header(${PROJECT_NAME})
 
   if(NOT BUILD_SHARED_LIBS)
@@ -107,7 +101,7 @@ else(AMALGAMATE_SOURCES)
   set_property(TARGET ${PROJECT_NAME} PROPERTY SOVERSION ${MINIZ_API_VERSION})
   
   target_include_directories(${PROJECT_NAME} PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
     $<INSTALL_INTERFACE:include>
   )
@@ -171,39 +165,12 @@ install(
     Devel
 )
 
+if(BUILD_TESTS)
+  add_subdirectory(tests)
+endif(BUILD_TESTS)
+
 if(BUILD_EXAMPLES)
-  set(EXAMPLE1_SRC_LIST "${CMAKE_CURRENT_SOURCE_DIR}/examples/example1.c")
-  set(EXAMPLE2_SRC_LIST "${CMAKE_CURRENT_SOURCE_DIR}/examples/example2.c")
-  set(EXAMPLE3_SRC_LIST "${CMAKE_CURRENT_SOURCE_DIR}/examples/example3.c")
-  set(EXAMPLE4_SRC_LIST "${CMAKE_CURRENT_SOURCE_DIR}/examples/example4.c")
-  set(EXAMPLE5_SRC_LIST "${CMAKE_CURRENT_SOURCE_DIR}/examples/example5.c")
-  set(EXAMPLE6_SRC_LIST "${CMAKE_CURRENT_SOURCE_DIR}/examples/example6.c")
-  set(MINIZ_TESTER_SRC_LIST
-      "${CMAKE_CURRENT_SOURCE_DIR}/tests/miniz_tester.cpp"
-      "${CMAKE_CURRENT_SOURCE_DIR}/tests/timer.cpp")
-
-  add_executable(example1 ${EXAMPLE1_SRC_LIST})
-  target_link_libraries(example1 miniz)
-  add_executable(example2 ${EXAMPLE2_SRC_LIST})
-  target_link_libraries(example2 miniz)
-  add_executable(example3 ${EXAMPLE3_SRC_LIST})
-  target_link_libraries(example3 miniz)
-  add_executable(example4 ${EXAMPLE4_SRC_LIST})
-  target_link_libraries(example4 miniz)
-  add_executable(example5 ${EXAMPLE5_SRC_LIST})
-  target_link_libraries(example5 miniz)
-  add_executable(example6 ${EXAMPLE6_SRC_LIST})
-  target_link_libraries(example6 miniz)
-  if(${UNIX})
-      target_link_libraries(example6 m)
-  endif()
-
-  # add_executable(miniz_tester ${MINIZ_TESTER_SRC_LIST})
-  # target_link_libraries(miniz_tester miniz)
+  add_subdirectory(examples)
 endif(BUILD_EXAMPLES)
 
-set(INCLUDE_INSTALL_DIR "include")
-
-install(FILES ${INSTALL_HEADERS} DESTINATION ${INCLUDE_INSTALL_DIR}/${PROJECT_NAME})
-
-
+install(FILES ${INSTALL_HEADERS} DESTINATION "include/${PROJECT_NAME}")
